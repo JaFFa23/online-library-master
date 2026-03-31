@@ -1,0 +1,66 @@
+@startuml
+skinparam linetype ortho
+title Sequence — Add Favorite (POST /users/me/favorites/{book_id})
+
+actor Client as C
+boundary "FavoritesRouter\n(FastAPI endpoint)" as R
+control "FavoriteService" as S
+entity "BookRepo" as B
+entity "FavoriteRepo" as F
+database "PostgreSQL" as DB
+
+C -> R : POST /api/v1/users/me/favorites/{book_id}\nHeaders: auth (JWT / X-User-Id)
+activate R
+
+R -> S : add_favorite(user_id, book_id)
+activate S
+
+' ensure book exists
+S -> B : get(book_id)
+activate B
+B -> DB : SELECT book WHERE id=book_id
+activate DB
+DB --> B : Book | null
+deactivate DB
+B --> S : Book | null
+deactivate B
+
+alt book not found
+  S --> R : raise HTTP 404
+  deactivate S
+  R --> C : 404 Not Found\n{"detail":"Book not found"}
+  deactivate R
+else book exists
+  ' avoid duplicates / idempotency
+  S -> F : exists(user_id, book_id)
+  activate F
+  F -> DB : SELECT 1 FROM favorites WHERE user_id=? AND book_id=?
+  activate DB
+  DB --> F : true/false
+  deactivate DB
+  F --> S : true/false
+  deactivate F
+
+  alt already exists
+    S --> R : return 204 No Content (idempotent)\n(or 409 if strict)
+    deactivate S
+    R --> C : 204 No Content
+    deactivate R
+  else not exists
+    S -> F : add(user_id, book_id)
+    activate F
+    F -> DB : INSERT INTO favorites(user_id, book_id)
+    activate DB
+    DB --> F : OK
+    deactivate DB
+    F --> S : OK
+    deactivate F
+
+    S --> R : 204 No Content
+    deactivate S
+    R --> C : 204 No Content
+    deactivate R
+  end
+end
+
+@enduml

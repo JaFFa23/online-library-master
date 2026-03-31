@@ -1,0 +1,57 @@
+@startuml
+skinparam linetype ortho
+title Sequence — Login (JWT-style)
+
+actor Client as C
+boundary "AuthRouter\n(FastAPI endpoint)" as R
+control "AuthService" as S
+entity "UserRepo" as U
+database "PostgreSQL" as DB
+control "PasswordHasher\n(passlib/bcrypt)" as H
+control "TokenIssuer\n(JWT)" as T
+
+C -> R : POST /api/v1/auth/login\n{email, password}
+activate R
+
+R -> S : login(email, password)
+activate S
+
+S -> U : get_by_email(email)
+activate U
+U -> DB : SELECT * FROM users WHERE email=...
+activate DB
+DB --> U : User | null
+deactivate DB
+U --> S : User | null
+deactivate U
+
+alt user not found
+  S --> R : raise HTTP 401/404
+  deactivate S
+  R --> C : 401 Unauthorized\n{"detail":"invalid credentials"}
+  deactivate R
+else user found
+  S -> H : verify(password, user.hashed_password)
+  activate H
+  H --> S : true/false
+  deactivate H
+
+  alt wrong password
+    S --> R : raise HTTP 401
+    deactivate S
+    R --> C : 401 Unauthorized\n{"detail":"invalid credentials"}
+    deactivate R
+  else ok
+    S -> T : create_access_token(sub=user.id, role=user.role)
+    activate T
+    T --> S : access_token
+    deactivate T
+
+    S --> R : TokenResponse(access_token, token_type="bearer")
+    deactivate S
+    R --> C : 200 OK\n{access_token, token_type}
+    deactivate R
+  end
+end
+
+@enduml

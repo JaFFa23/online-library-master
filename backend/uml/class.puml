@@ -1,0 +1,169 @@
+@startuml
+' Layered classes: router/service/repository/models
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+hide empty members
+
+title Online Library — Main Layers (Router / Service / Repo / Models)
+
+package "api (routers)" {
+  class AuthRouter <<router>> {
+    +POST /auth/register()
+    +POST /auth/login()
+  }
+
+  class BooksRouter <<router>> {
+    +GET /books
+    +GET /books/{id}
+    +POST /books (admin)
+    +DELETE /books/{id} (admin)
+  }
+
+  class FavoritesRouter <<router>> {
+    +POST /users/me/favorites/{book_id}
+    +DELETE /users/me/favorites/{book_id}
+  }
+
+  class AdminRouter <<router>> {
+    +GET /admin/books/export.csv
+  }
+}
+
+package "services (business logic)" {
+  class AuthService <<service>> {
+    +register(email, password) : User
+    +login(email, password) : Token
+  }
+
+  class BookService <<service>> {
+    +list() : list[Book]
+    +get(book_id) : Book
+    +create(dto) : Book
+    +delete(book_id) : void
+  }
+
+  class FavoriteService <<service>> {
+    +add_favorite(user_id, book_id) : void
+    +remove_favorite(user_id, book_id) : void
+  }
+
+  class AdminService <<service>> {
+    +export_books_csv() : bytes
+  }
+}
+
+package "repositories (data access)" {
+  class UserRepo <<repo>> {
+    +get_by_email(email) : User?
+    +get_by_id(id) : User?
+    +create(user) : User
+  }
+
+  class BookRepo <<repo>> {
+    +list() : list[Book]
+    +get(book_id) : Book?
+    +create(book) : Book
+    +delete(book) : void
+  }
+
+  class AuthorRepo <<repo>> {
+    +get_by_ids(ids) : list[Author]
+    +get_or_create_by_names(names) : list[Author]
+  }
+
+  class GenreRepo <<repo>> {
+    +get_by_ids(ids) : list[Genre]
+    +get_or_create_by_names(names) : list[Genre]
+  }
+
+  class FavoriteRepo <<repo>> {
+    +exists(user_id, book_id) : bool
+    +add(user_id, book_id) : void
+    +remove(user_id, book_id) : void
+  }
+
+  class DbSession <<db>> {
+    +commit()
+    +flush()
+    +execute()
+  }
+}
+
+package "models (SQLAlchemy)" {
+  class User <<model>> {
+    +id : int
+    +email : str
+    +hashed_password : str
+    +role : str
+  }
+
+  class Book <<model>> {
+    +id : int
+    +title : str
+    +description : str?
+    +year : int?
+    +isbn : str?
+  }
+
+  class Author <<model>> {
+    +id : int
+    +name : str
+  }
+
+  class Genre <<model>> {
+    +id : int
+    +name : str
+  }
+
+  class Favorite <<model>> {
+    +user_id : int
+    +book_id : int
+  }
+
+  class BookAuthor <<model>> {
+    +book_id : int
+    +author_id : int
+  }
+
+  class BookGenre <<model>> {
+    +book_id : int
+    +genre_id : int
+  }
+}
+
+' Router -> Service
+AuthRouter ..> AuthService
+BooksRouter ..> BookService
+FavoritesRouter ..> FavoriteService
+AdminRouter ..> AdminService
+
+' Service -> Repo
+AuthService ..> UserRepo
+BookService ..> BookRepo
+BookService ..> AuthorRepo
+BookService ..> GenreRepo
+FavoriteService ..> FavoriteRepo
+FavoriteService ..> BookRepo
+AdminService ..> BookRepo
+
+' Repo -> DB session
+UserRepo ..> DbSession
+BookRepo ..> DbSession
+AuthorRepo ..> DbSession
+GenreRepo ..> DbSession
+FavoriteRepo ..> DbSession
+
+' Repo -> Models
+UserRepo ..> User
+BookRepo ..> Book
+AuthorRepo ..> Author
+GenreRepo ..> Genre
+FavoriteRepo ..> Favorite
+
+' Model relations (logical)
+User "1" o-- "*" Favorite
+Book "1" o-- "*" Favorite
+Book "*" -- "*" Author : via BookAuthor
+Book "*" -- "*" Genre : via BookGenre
+
+@enduml

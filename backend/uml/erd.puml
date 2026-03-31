@@ -1,0 +1,77 @@
+@startuml
+' ERD / database schema (logical)
+hide circle
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor White
+  BorderColor Black
+}
+
+title Online Library — ERD
+
+entity "users" as users {
+  * id : int <<PK>>
+  --
+  * email : varchar <<UQ>>
+  * hashed_password : varchar
+  * role : varchar  ' guest|client|admin
+  created_at : datetime
+  updated_at : datetime
+}
+
+entity "books" as books {
+  * id : int <<PK>>
+  --
+  * title : varchar
+  description : text
+  year : int
+  isbn : varchar <<UQ>>
+  created_at : datetime
+  updated_at : datetime
+}
+
+entity "authors" as authors {
+  * id : int <<PK>>
+  --
+  * name : varchar <<UQ>>
+}
+
+entity "genres" as genres {
+  * id : int <<PK>>
+  --
+  * name : varchar <<UQ>>
+}
+
+entity "favorites" as favorites {
+  * user_id : int <<FK>>
+  * book_id : int <<FK>>
+  --
+  created_at : datetime
+  ' UNIQUE(user_id, book_id)
+}
+
+entity "book_authors" as book_authors {
+  * book_id : int <<FK>>
+  * author_id : int <<FK>>
+  --
+  ' composite PK (book_id, author_id)
+}
+
+entity "book_genres" as book_genres {
+  * book_id : int <<FK>>
+  * genre_id : int <<FK>>
+  --
+  ' composite PK (book_id, genre_id)
+}
+
+' Relations
+users ||--o{ favorites : "1 user -> many favorites"
+books ||--o{ favorites : "1 book -> many favorites"
+
+books ||--o{ book_authors
+authors ||--o{ book_authors
+
+books ||--o{ book_genres
+genres ||--o{ book_genres
+
+@enduml
