@@ -1,4 +1,4 @@
-# Online Library1
+# Online Library
 
 **Client–server system:** FastAPI API + PostgreSQL + Telegram Bot (aiogram 3)
 
